@@ -9,8 +9,8 @@ homepage = "https://github.com/callumio/suck"
 repository = "https://github.com/callumio/suck"
 readme = "README.md"
 license = "MIT"
-keywords = []
-categories = []
+keywords = ["channel", "pull", "producer-consumer", "threading"]
+categories = ["concurrency", "data-structures", "rust-patterns"]
 exclude = ["flake.nix", "flake.lock", ".envrc", "cliff.toml", "release-plz.toml", "rustfmt.toml", ".github"]
 
 [dependencies]
