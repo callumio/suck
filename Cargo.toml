@@ -1,0 +1,18 @@
+[package]
+name = "suck"
+description = "Suck data up through a channel"
+authors = ["Callum Leslie <git@cleslie.uk>"]
+version = "0.0.0"
+edition = "2024"
+documentation = "https://docs.rs/suck"
+homepage = "https://github.com/callumio/suck"
+repository = "https://github.com/callumio/suck"
+readme = "README.md"
+license = "MIT"
+keywords = []
+categories = []
+exclude = ["flake.nix", "flake.lock", ".envrc", "cliff.toml", "release-plz.toml", "rustfmt.toml", ".github"]
+
+[dependencies]
+
+[lib]
