@@ -16,6 +16,6 @@ pub enum Error {
     NoSource,
 
     /// Internal error (e.g., mutex poisoning or source execution failure)
-    #[error("Internal error occured")] // TODO: Expand on this
+    #[error("Internal error occurred")] // TODO: Expand on this
     InternalError,
 }
