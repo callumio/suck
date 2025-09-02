@@ -11,6 +11,8 @@ Suck data up through a channel
 
 </div>
 
+> [!WARNING]\
+> This is unstable, untested and subject to change - use at your own risk.
 
 ## Features
 
