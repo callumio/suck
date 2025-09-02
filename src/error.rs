@@ -10,6 +10,6 @@ pub enum Error {
     /// No value source has been set
     NoSource,
 
-    /// Closure execution panicked
-    ClosurePanic,
+    /// Internal error (e.g., mutex poisoning or source execution failure)
+    InternalError,
 }
