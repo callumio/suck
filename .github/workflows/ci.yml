@@ -26,7 +26,7 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - name: Minimal build
-        run: cargo build --no-default-features
+        run: cargo build 
       - name: Clippy
         run: cargo clippy --all-features --examples -- -D warnings
       - name: Build all
