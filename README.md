@@ -32,11 +32,11 @@ suck = "*"
 ## Quick Start
 
 ```rust
-use suck::SuckPair;
+use suck::sync::StdSuck;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create a pair
-    let (sucker, sourcer) = SuckPair::<i32>::pair();
+    // Create a pair (using default std backend)
+    let (sucker, sourcer) = StdSuck::<i32>::pair();
 
     // Start producer in a thread
     let producer = std::thread::spawn(move || {

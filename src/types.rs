@@ -12,14 +12,14 @@ pub enum Response<T> {
 }
 
 /// Represents the source of values: either static or dynamic
-pub enum ValueSource<T> {
+pub(crate) enum ValueSource<T> {
     Static(T),
     Dynamic(Box<dyn Fn() -> T + Send + Sync + 'static>),
     None,
 }
 
 /// Internal channel state shared between producer and consumer
-pub struct ChannelState<T> {
-    pub source: ValueSource<T>,
-    pub closed: bool,
+pub(crate) struct ChannelState<T> {
+    pub(crate) source: ValueSource<T>,
+    pub(crate) closed: bool,
 }
