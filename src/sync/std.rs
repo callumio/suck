@@ -1,5 +1,6 @@
 use crate::sync::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
 use crate::types;
+use std::sync::atomic::AtomicBool;
 #[cfg(feature = "sync-std")]
 use std::sync::mpsc;
 
@@ -68,7 +69,7 @@ impl<T> StdSuck<T> {
         let sucker = crate::Sucker {
             request_tx,
             response_rx,
-            closed: std::sync::Mutex::new(false),
+            closed: AtomicBool::new(false),
             _phantom: std::marker::PhantomData,
         };
 
