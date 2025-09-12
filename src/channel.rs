@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::error::Error;
@@ -12,7 +13,7 @@ where
 {
     pub(crate) request_tx: ST,
     pub(crate) response_rx: SR,
-    pub(crate) closed: Mutex<bool>,
+    pub(crate) closed: AtomicBool,
     pub(crate) _phantom: std::marker::PhantomData<T>,
 }
 
@@ -127,7 +128,7 @@ where
     /// Get the current value from the producer
     pub fn get(&self) -> Result<T, Error> {
         // Check if locally marked as closed
-        if *self.closed.lock().unwrap() {
+        if self.closed.load(Ordering::Acquire) {
             return Err(Error::ChannelClosed);
         }
 
@@ -152,7 +153,7 @@ where
     /// Close the channel from the consumer side
     pub fn close(&self) -> Result<(), Error> {
         // Mark locally as closed
-        *self.closed.lock().unwrap() = true;
+        self.closed.store(true, Ordering::Release);
 
         // Send close request
         self.request_tx

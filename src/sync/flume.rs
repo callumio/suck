@@ -1,3 +1,5 @@
+use std::sync::atomic::AtomicBool;
+
 #[cfg(feature = "sync-flume")]
 use crate::sync::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
 use crate::types;
@@ -70,7 +72,7 @@ impl<T> FlumeSuck<T> {
         let sucker = crate::Sucker {
             request_tx,
             response_rx,
-            closed: std::sync::Mutex::new(false),
+            closed: AtomicBool::new(false),
             _phantom: std::marker::PhantomData,
         };
 
