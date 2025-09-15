@@ -20,11 +20,17 @@
     flake-utils.lib.eachDefaultSystem (system: let
       overlays = [(import rust-overlay)];
       pkgs = import nixpkgs {inherit system overlays;};
-      rustToolchain = pkgs.pkgsBuildHost.rust-bin.stable.latest.default;
+      rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+      rustToolchainNightly = pkgs.pkgsBuildHost.rust-bin.nightly.latest.default;
       tools = with pkgs; [cargo-nextest];
-      nativeBuildInputs = with pkgs; [rustToolchain pkg-config] ++ tools;
+      nativeBuildInputs = with pkgs; [rustToolchain rustToolchainNightly pkg-config] ++ tools;
     in
       with pkgs; {
-        devShells.default = mkShell {inherit nativeBuildInputs;};
+        devShells.default = mkShell {
+          inherit nativeBuildInputs;
+          shellHook = ''
+            export CARGO_NIGHTLY="${rustToolchainNightly}/bin/cargo"
+          '';
+        };
       });
 }
