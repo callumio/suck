@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 /// Request messages sent from consumer to producer
 pub enum Request {
     GetValue,
@@ -15,11 +17,9 @@ pub enum Response<T> {
 pub(crate) enum ValueSource<T> {
     Static(T),
     Dynamic(Box<dyn Fn() -> T + Send + Sync + 'static>),
-    None,
+    None,    // Never set
+    Cleared, // Was set but cleared (closed)
 }
 
 /// Internal channel state shared between producer and consumer
-pub(crate) struct ChannelState<T> {
-    pub(crate) source: ValueSource<T>,
-    pub(crate) closed: bool,
-}
+pub(crate) type ChannelState<T> = Arc<Mutex<ValueSource<T>>>;

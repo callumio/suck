@@ -64,10 +64,7 @@ impl<T> FlumeSuck<T> {
         let (request_tx, request_rx) = FlumeChannel::create_request_channel();
         let (response_tx, response_rx) = FlumeChannel::create_response_channel::<T>();
 
-        let state = std::sync::Arc::new(std::sync::Mutex::new(crate::types::ChannelState {
-            source: crate::types::ValueSource::None,
-            closed: false,
-        }));
+        let state = std::sync::Arc::new(std::sync::Mutex::new(crate::types::ValueSource::None));
 
         let sucker = crate::Sucker {
             request_tx,

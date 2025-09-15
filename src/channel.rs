@@ -1,5 +1,4 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 
 use crate::error::Error;
 use crate::sync::traits::{ChannelReceiver, ChannelSender};
@@ -25,7 +24,7 @@ where
 {
     pub(crate) request_rx: SR,
     pub(crate) response_tx: ST,
-    pub(crate) state: Arc<Mutex<ChannelState<T>>>,
+    pub(crate) state: ChannelState<T>,
     pub(crate) _phantom: std::marker::PhantomData<T>,
 }
 
@@ -38,10 +37,7 @@ where
     /// Set a fixed value
     pub fn set_static(&self, value: T) -> Result<(), Error> {
         let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-        if state.closed {
-            return Err(Error::ChannelClosed);
-        }
-        state.source = ValueSource::Static(value);
+        *state = ValueSource::Static(value);
         Ok(())
     }
 
@@ -51,18 +47,14 @@ where
         F: Fn() -> T + Send + Sync + 'static,
     {
         let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-        if state.closed {
-            return Err(Error::ChannelClosed);
-        }
-        state.source = ValueSource::Dynamic(Box::new(closure));
+        *state = ValueSource::Dynamic(Box::new(closure));
         Ok(())
     }
 
     /// Close the channel
     pub fn close(&self) -> Result<(), Error> {
         let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-        state.closed = true;
-        state.source = ValueSource::None;
+        *state = ValueSource::Cleared;
         Ok(())
     }
 
@@ -80,8 +72,7 @@ where
                 Ok(Request::Close) => {
                     // Close channel
                     let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-                    state.closed = true;
-                    state.source = ValueSource::None;
+                    *state = ValueSource::Cleared;
                     break;
                 }
                 Err(_) => {
@@ -95,11 +86,8 @@ where
 
     fn handle_get_value(&self) -> Result<Response<T>, Error> {
         let state = self.state.lock().map_err(|_| Error::InternalError)?;
-        if state.closed {
-            return Ok(Response::Closed);
-        }
 
-        match &state.source {
+        match &*state {
             ValueSource::Static(value) => Ok(Response::Value(value.clone())),
             ValueSource::Dynamic(closure) => {
                 let value = self.execute_closure_safely(closure);
@@ -108,7 +96,8 @@ where
                     Err(_) => Ok(Response::NoSource), // Closure execution failed
                 }
             }
-            ValueSource::None => Ok(Response::NoSource),
+            ValueSource::None => Ok(Response::NoSource), // No source was ever set
+            ValueSource::Cleared => Ok(Response::Closed), // Channel was closed (source was set then cleared)
         }
     }
 
