@@ -2,7 +2,7 @@
 name = "suck"
 description = "Suck data up through a channel"
 authors = ["Callum Leslie <git@cleslie.uk>"]
-version = "0.0.2"
+version = "0.0.3"
 edition = "2024"
 documentation = "https://docs.rs/suck"
 homepage = "https://github.com/callumio/suck"
