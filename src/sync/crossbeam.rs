@@ -1,5 +1,3 @@
-use std::sync::atomic::AtomicBool;
-
 #[cfg(feature = "sync-crossbeam")]
 use crate::sync::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
 use crate::types;
@@ -66,19 +64,8 @@ impl<T> CrossbeamSuck<T> {
 
         let state = std::sync::Arc::new(std::sync::Mutex::new(crate::types::ValueSource::None));
 
-        let sucker = crate::Sucker {
-            request_tx,
-            response_rx,
-            closed: AtomicBool::new(false),
-            _phantom: std::marker::PhantomData,
-        };
-
-        let sourcer = crate::Sourcer {
-            request_rx,
-            response_tx,
-            state: std::sync::Arc::clone(&state),
-            _phantom: std::marker::PhantomData,
-        };
+        let sucker = crate::Sucker::new(request_tx, response_rx);
+        let sourcer = crate::Sourcer::new(request_rx, response_tx, std::sync::Arc::clone(&state));
 
         (sucker, sourcer)
     }

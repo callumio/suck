@@ -10,10 +10,26 @@ where
     ST: ChannelSender<Request>,
     SR: ChannelReceiver<Response<T>>,
 {
-    pub(crate) request_tx: ST,
-    pub(crate) response_rx: SR,
-    pub(crate) closed: AtomicBool,
-    pub(crate) _phantom: std::marker::PhantomData<T>,
+    request_tx: ST,
+    response_rx: SR,
+    closed: AtomicBool,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T, ST, SR> Sucker<T, ST, SR>
+where
+    ST: ChannelSender<Request>,
+    SR: ChannelReceiver<Response<T>>,
+{
+    /// Create a new Sucker instance
+    pub(crate) fn new(request_tx: ST, response_rx: SR) -> Self {
+        Self {
+            request_tx,
+            response_rx,
+            closed: AtomicBool::new(false),
+            _phantom: std::marker::PhantomData,
+        }
+    }
 }
 
 /// The producer side of the channel that provides values
@@ -22,10 +38,26 @@ where
     SR: ChannelReceiver<Request>,
     ST: ChannelSender<Response<T>>,
 {
-    pub(crate) request_rx: SR,
-    pub(crate) response_tx: ST,
-    pub(crate) state: ChannelState<T>,
-    pub(crate) _phantom: std::marker::PhantomData<T>,
+    request_rx: SR,
+    response_tx: ST,
+    state: ChannelState<T>,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T, SR, ST> Sourcer<T, SR, ST>
+where
+    SR: ChannelReceiver<Request>,
+    ST: ChannelSender<Response<T>>,
+{
+    /// Create a new Sourcer instance
+    pub(crate) fn new(request_rx: SR, response_tx: ST, state: ChannelState<T>) -> Self {
+        Self {
+            request_rx,
+            response_tx,
+            state,
+            _phantom: std::marker::PhantomData,
+        }
+    }
 }
 
 impl<T, SR, ST> Sourcer<T, SR, ST>
