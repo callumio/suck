@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 #[cfg(feature = "sync-crossbeam")]
 use crate::sync::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
 use crate::types;
+use arc_swap::ArcSwap;
 use crossbeam_channel;
 
 type CrossbeamSucker<T> =
@@ -62,10 +65,10 @@ impl<T> CrossbeamSuck<T> {
         let (request_tx, request_rx) = CrossbeamChannel::create_request_channel();
         let (response_tx, response_rx) = CrossbeamChannel::create_response_channel::<T>();
 
-        let state = std::sync::Arc::new(std::sync::Mutex::new(crate::types::ValueSource::None));
+        let state = ArcSwap::new(Arc::new(crate::types::ValueSource::None));
 
         let sucker = crate::Sucker::new(request_tx, response_rx);
-        let sourcer = crate::Sourcer::new(request_rx, response_tx, std::sync::Arc::clone(&state));
+        let sourcer = crate::Sourcer::new(request_rx, response_tx, state);
 
         (sucker, sourcer)
     }
