@@ -117,9 +117,9 @@ where
     }
 
     fn handle_get_value(&self) -> Result<Response<T>, Error> {
-        let state = self.state.lock().map_err(|_| Error::InternalError)?;
+        let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
 
-        match &*state {
+        match &mut *state {
             ValueSource::Static(value) => Ok(Response::Value(value.clone())),
             ValueSource::Dynamic(closure) => {
                 let value = self.execute_closure_safely(closure);
@@ -135,7 +135,7 @@ where
 
     fn execute_closure_safely(
         &self,
-        closure: &dyn Fn() -> T,
+        closure: &mut dyn FnMut() -> T,
     ) -> Result<T, Box<dyn std::any::Any + Send>> {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(closure))
     }
