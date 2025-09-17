@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
+
+use arc_swap::ArcSwap;
 
 /// Request messages sent from consumer to producer
 pub enum Request {
@@ -16,10 +18,10 @@ pub enum Response<T> {
 /// Represents the source of values: either static or dynamic
 pub(crate) enum ValueSource<T> {
     Static(T),
-    Dynamic(Box<dyn FnMut() -> T + Send + Sync + 'static>),
+    Dynamic(Mutex<Box<dyn FnMut() -> T + Send + Sync + 'static>>),
     None,    // Never set
     Cleared, // Was set but cleared (closed)
 }
 
 /// Internal channel state shared between producer and consumer
-pub(crate) type ChannelState<T> = Arc<Mutex<ValueSource<T>>>;
+pub(crate) type ChannelState<T> = ArcSwap<ValueSource<T>>;

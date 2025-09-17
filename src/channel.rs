@@ -1,4 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use crate::error::Error;
 use crate::sync::traits::{ChannelReceiver, ChannelSender};
@@ -68,8 +69,7 @@ where
 {
     /// Set a fixed value
     pub fn set_static(&self, value: T) -> Result<(), Error> {
-        let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-        *state = ValueSource::Static(value);
+        self.state.swap(Arc::new(ValueSource::Static(value)));
         Ok(())
     }
 
@@ -78,15 +78,16 @@ where
     where
         F: Fn() -> T + Send + Sync + 'static,
     {
-        let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-        *state = ValueSource::Dynamic(Box::new(closure));
+        self.state
+            .swap(Arc::new(ValueSource::Dynamic(Mutex::new(Box::new(
+                closure,
+            )))));
         Ok(())
     }
 
     /// Close the channel
     pub fn close(&self) -> Result<(), Error> {
-        let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-        *state = ValueSource::Cleared;
+        self.state.swap(Arc::new(ValueSource::Cleared));
         Ok(())
     }
 
@@ -103,8 +104,7 @@ where
                 }
                 Ok(Request::Close) => {
                     // Close channel
-                    let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-                    *state = ValueSource::Cleared;
+                    self.close()?;
                     break;
                 }
                 Err(_) => {
@@ -117,12 +117,13 @@ where
     }
 
     fn handle_get_value(&self) -> Result<Response<T>, Error> {
-        let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
+        let state = self.state.load();
 
-        match &mut *state {
+        match &**state {
             ValueSource::Static(value) => Ok(Response::Value(value.clone())),
             ValueSource::Dynamic(closure) => {
-                let value = self.execute_closure_safely(closure);
+                let mut closure = closure.lock().unwrap();
+                let value = self.execute_closure_safely(&mut *closure);
                 match value {
                     Ok(v) => Ok(Response::Value(v)),
                     Err(_) => Ok(Response::NoSource), // Closure execution failed
