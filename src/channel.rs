@@ -73,13 +73,23 @@ where
         Ok(())
     }
 
-    /// Set a closure
+    /// Set a closure that implements [Fn]
     pub fn set<F>(&self, closure: F) -> Result<(), Error>
     where
         F: Fn() -> T + Send + Sync + 'static,
     {
         self.state
-            .swap(Arc::new(ValueSource::Dynamic(Mutex::new(Box::new(
+            .swap(Arc::new(ValueSource::Dynamic(Box::new(closure))));
+        Ok(())
+    }
+
+    /// Set a closure that implements [FnMut]
+    pub fn set_mut<F>(&self, closure: F) -> Result<(), Error>
+    where
+        F: FnMut() -> T + Send + Sync + 'static,
+    {
+        self.state
+            .swap(Arc::new(ValueSource::DynamicMut(Mutex::new(Box::new(
                 closure,
             )))));
         Ok(())
@@ -122,6 +132,13 @@ where
         match &**state {
             ValueSource::Static(value) => Ok(Response::Value(value.clone())),
             ValueSource::Dynamic(closure) => {
+                let value = self.execute_closure_safely(&mut || closure());
+                match value {
+                    Ok(v) => Ok(Response::Value(v)),
+                    Err(_) => Ok(Response::NoSource), // Closure execution failed
+                }
+            }
+            ValueSource::DynamicMut(closure) => {
                 let mut closure = closure.lock().unwrap();
                 let value = self.execute_closure_safely(&mut *closure);
                 match value {
