@@ -17,7 +17,7 @@ pub enum Response<T> {
 
 /// Represents the source of values: either static or dynamic
 pub(crate) enum ValueSource<T> {
-    Static(T),
+    Static { val: T, clone: fn(&T) -> T },
     DynamicMut(Mutex<Box<dyn FnMut() -> T + Send + Sync + 'static>>),
     Dynamic(Box<dyn Fn() -> T + Send + Sync + 'static>),
     None,    // Never set

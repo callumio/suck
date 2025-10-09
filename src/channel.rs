@@ -63,13 +63,19 @@ where
 
 impl<T, SR, ST> Sourcer<T, SR, ST>
 where
-    T: Clone + Send + 'static,
+    T: Send + 'static,
     SR: ChannelReceiver<Request>,
     ST: ChannelSender<Response<T>>,
 {
     /// Set a fixed value
-    pub fn set_static(&self, value: T) -> Result<(), Error> {
-        self.state.swap(Arc::new(ValueSource::Static(value)));
+    pub fn set_static(&self, val: T) -> Result<(), Error>
+    where
+        T: Clone,
+    {
+        self.state.swap(Arc::new(ValueSource::Static {
+            val,
+            clone: T::clone,
+        }));
         Ok(())
     }
 
@@ -130,7 +136,13 @@ where
         let state = self.state.load();
 
         match &**state {
-            ValueSource::Static(value) => Ok(Response::Value(value.clone())),
+            ValueSource::Static { val, clone } => {
+                let value = self.execute_closure_safely(&mut || clone(val));
+                match value {
+                    Ok(v) => Ok(Response::Value(v)),
+                    Err(_) => Ok(Response::NoSource), // Closure execution failed
+                }
+            }
             ValueSource::Dynamic(closure) => {
                 let value = self.execute_closure_safely(&mut || closure());
                 match value {
