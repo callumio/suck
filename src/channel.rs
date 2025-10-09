@@ -1,4 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use crate::error::Error;
 use crate::sync::traits::{ChannelReceiver, ChannelSender};
@@ -62,31 +63,47 @@ where
 
 impl<T, SR, ST> Sourcer<T, SR, ST>
 where
-    T: Clone + Send + 'static,
+    T: Send + 'static,
     SR: ChannelReceiver<Request>,
     ST: ChannelSender<Response<T>>,
 {
     /// Set a fixed value
-    pub fn set_static(&self, value: T) -> Result<(), Error> {
-        let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-        *state = ValueSource::Static(value);
+    pub fn set_static(&self, val: T) -> Result<(), Error>
+    where
+        T: Clone,
+    {
+        self.state.swap(Arc::new(ValueSource::Static {
+            val,
+            clone: T::clone,
+        }));
         Ok(())
     }
 
-    /// Set a closure
+    /// Set a closure that implements [Fn]
     pub fn set<F>(&self, closure: F) -> Result<(), Error>
     where
         F: Fn() -> T + Send + Sync + 'static,
     {
-        let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-        *state = ValueSource::Dynamic(Box::new(closure));
+        self.state
+            .swap(Arc::new(ValueSource::Dynamic(Box::new(closure))));
+        Ok(())
+    }
+
+    /// Set a closure that implements [FnMut]
+    pub fn set_mut<F>(&self, closure: F) -> Result<(), Error>
+    where
+        F: FnMut() -> T + Send + Sync + 'static,
+    {
+        self.state
+            .swap(Arc::new(ValueSource::DynamicMut(Mutex::new(Box::new(
+                closure,
+            )))));
         Ok(())
     }
 
     /// Close the channel
     pub fn close(&self) -> Result<(), Error> {
-        let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-        *state = ValueSource::Cleared;
+        self.state.swap(Arc::new(ValueSource::Cleared));
         Ok(())
     }
 
@@ -103,8 +120,7 @@ where
                 }
                 Ok(Request::Close) => {
                     // Close channel
-                    let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
-                    *state = ValueSource::Cleared;
+                    self.close()?;
                     break;
                 }
                 Err(_) => {
@@ -117,12 +133,26 @@ where
     }
 
     fn handle_get_value(&self) -> Result<Response<T>, Error> {
-        let state = self.state.lock().map_err(|_| Error::InternalError)?;
+        let state = self.state.load();
 
-        match &*state {
-            ValueSource::Static(value) => Ok(Response::Value(value.clone())),
+        match &**state {
+            ValueSource::Static { val, clone } => {
+                let value = self.execute_closure_safely(&mut || clone(val));
+                match value {
+                    Ok(v) => Ok(Response::Value(v)),
+                    Err(_) => Ok(Response::NoSource), // Closure execution failed
+                }
+            }
             ValueSource::Dynamic(closure) => {
-                let value = self.execute_closure_safely(closure);
+                let value = self.execute_closure_safely(&mut || closure());
+                match value {
+                    Ok(v) => Ok(Response::Value(v)),
+                    Err(_) => Ok(Response::NoSource), // Closure execution failed
+                }
+            }
+            ValueSource::DynamicMut(closure) => {
+                let mut closure = closure.lock().unwrap();
+                let value = self.execute_closure_safely(&mut *closure);
                 match value {
                     Ok(v) => Ok(Response::Value(v)),
                     Err(_) => Ok(Response::NoSource), // Closure execution failed
@@ -135,7 +165,7 @@ where
 
     fn execute_closure_safely(
         &self,
-        closure: &dyn Fn() -> T,
+        closure: &mut dyn FnMut() -> T,
     ) -> Result<T, Box<dyn std::any::Any + Send>> {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(closure))
     }

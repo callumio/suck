@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 #[cfg(feature = "sync-flume")]
 use crate::sync::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
 use crate::types;
+use arc_swap::ArcSwap;
 use flume;
 
 type FlumeSucker<T> =
@@ -62,10 +65,11 @@ impl<T> FlumeSuck<T> {
         let (request_tx, request_rx) = FlumeChannel::create_request_channel();
         let (response_tx, response_rx) = FlumeChannel::create_response_channel::<T>();
 
-        let state = std::sync::Arc::new(std::sync::Mutex::new(crate::types::ValueSource::None));
+        let state = Arc::new(crate::types::ValueSource::None);
+        let state = ArcSwap::new(state);
 
         let sucker = crate::Sucker::new(request_tx, response_rx);
-        let sourcer = crate::Sourcer::new(request_rx, response_tx, std::sync::Arc::clone(&state));
+        let sourcer = crate::Sourcer::new(request_rx, response_tx, state);
 
         (sucker, sourcer)
     }
