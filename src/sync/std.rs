@@ -6,8 +6,10 @@ use std::sync::Arc;
 #[cfg(feature = "sync-std")]
 use std::sync::mpsc;
 
-type StdSucker<T> = crate::Sucker<T, StdSender<types::Request>, StdReceiver<types::Response<T>>>;
-type StdSourcer<T> = crate::Sourcer<T, StdReceiver<types::Request>, StdSender<types::Response<T>>>;
+type StdSucker<T> =
+    crate::sync::channel::Sucker<T, StdSender<types::Request>, StdReceiver<types::Response<T>>>;
+type StdSourcer<T> =
+    crate::sync::channel::Sourcer<T, StdReceiver<types::Request>, StdSender<types::Response<T>>>;
 
 /// Internal sender type for std backend
 pub struct StdSender<T>(mpsc::Sender<T>);
@@ -66,8 +68,8 @@ impl<T> StdSuck<T> {
         let state = Arc::new(crate::types::ValueSource::None);
         let state = ArcSwap::new(state);
 
-        let sucker = crate::Sucker::new(request_tx, response_rx);
-        let sourcer = crate::Sourcer::new(request_rx, response_tx, state);
+        let sucker = crate::sync::channel::Sucker::new(request_tx, response_rx);
+        let sourcer = crate::sync::channel::Sourcer::new(request_rx, response_tx, state);
 
         (sucker, sourcer)
     }
@@ -236,7 +238,7 @@ mod tests {
 
         let state = Arc::new(crate::types::ValueSource::None);
         let state = ArcSwap::new(state);
-        let sourcer = crate::Sourcer::new(request_rx, response_tx, state);
+        let sourcer = crate::sync::channel::Sourcer::new(request_rx, response_tx, state);
         sourcer.set_static(42).unwrap();
 
         let producer_handle = thread::spawn(move || sourcer.run().unwrap());
@@ -254,7 +256,7 @@ mod tests {
 
         let state = Arc::new(crate::types::ValueSource::None);
         let state = ArcSwap::new(state);
-        let sourcer = crate::Sourcer::new(request_rx, response_tx, state);
+        let sourcer = crate::sync::channel::Sourcer::new(request_rx, response_tx, state);
 
         sourcer.run().unwrap();
     }

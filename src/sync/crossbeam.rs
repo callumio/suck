@@ -7,9 +7,17 @@ use arc_swap::ArcSwap;
 use crossbeam_channel;
 
 type CrossbeamSucker<T> =
-    crate::Sucker<T, CrossbeamSender<types::Request>, CrossbeamReceiver<types::Response<T>>>;
+    crate::sync::channel::Sucker<
+        T,
+        CrossbeamSender<types::Request>,
+        CrossbeamReceiver<types::Response<T>>,
+    >;
 type CrossbeamSourcer<T> =
-    crate::Sourcer<T, CrossbeamReceiver<types::Request>, CrossbeamSender<types::Response<T>>>;
+    crate::sync::channel::Sourcer<
+        T,
+        CrossbeamReceiver<types::Request>,
+        CrossbeamSender<types::Response<T>>,
+    >;
 
 /// Internal sender type for crossbeam backend
 pub struct CrossbeamSender<T>(crossbeam_channel::Sender<T>);
@@ -67,8 +75,8 @@ impl<T> CrossbeamSuck<T> {
 
         let state = ArcSwap::new(Arc::new(crate::types::ValueSource::None));
 
-        let sucker = crate::Sucker::new(request_tx, response_rx);
-        let sourcer = crate::Sourcer::new(request_rx, response_tx, state);
+        let sucker = crate::sync::channel::Sucker::new(request_tx, response_rx);
+        let sourcer = crate::sync::channel::Sourcer::new(request_rx, response_tx, state);
 
         (sucker, sourcer)
     }

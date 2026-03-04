@@ -1,4 +1,5 @@
 pub mod traits;
+pub mod channel;
 
 #[cfg(feature = "sync-crossbeam")]
 pub mod crossbeam;

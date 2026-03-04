@@ -1,10 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
-#[cfg(feature = "async")]
-pub mod async_channel;
-#[cfg(feature = "sync")]
-pub mod channel;
 pub mod error;
 
 #[cfg(feature = "async")]
@@ -15,7 +11,7 @@ pub mod sync;
 pub mod types;
 
 #[cfg(feature = "async")]
-pub use async_channel::{AsyncSourcer, AsyncSucker};
+pub use asynchronous::channel::{AsyncSourcer, AsyncSucker};
 #[cfg(feature = "sync")]
-pub use channel::{Sourcer, Sucker};
+pub use sync::channel::{Sourcer, Sucker};
 pub use error::Error;
