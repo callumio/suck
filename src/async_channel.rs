@@ -1,15 +1,15 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+use crate::asynchronous::traits::{AsyncChannelReceiver, AsyncChannelSender};
 use crate::error::Error;
-use crate::traits::{ChannelReceiver, ChannelSender};
 use crate::types::{ChannelState, Request, Response, ValueSource};
 
-/// The consumer side of the channel that requests values
-pub struct Sucker<T, ST, SR>
+/// The consumer side of the channel that requests values asynchronously.
+pub struct AsyncSucker<T, ST, SR>
 where
-    ST: ChannelSender<Request>,
-    SR: ChannelReceiver<Response<T>>,
+    ST: AsyncChannelSender<Request>,
+    SR: AsyncChannelReceiver<Response<T>>,
 {
     request_tx: ST,
     response_rx: SR,
@@ -17,12 +17,11 @@ where
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T, ST, SR> Sucker<T, ST, SR>
+impl<T, ST, SR> AsyncSucker<T, ST, SR>
 where
-    ST: ChannelSender<Request>,
-    SR: ChannelReceiver<Response<T>>,
+    ST: AsyncChannelSender<Request>,
+    SR: AsyncChannelReceiver<Response<T>>,
 {
-    /// Create a new Sucker instance
     pub(crate) fn new(request_tx: ST, response_rx: SR) -> Self {
         Self {
             request_tx,
@@ -33,11 +32,11 @@ where
     }
 }
 
-/// The producer side of the channel that provides values
-pub struct Sourcer<T, SR, ST>
+/// The producer side of the channel that provides values asynchronously.
+pub struct AsyncSourcer<T, SR, ST>
 where
-    SR: ChannelReceiver<Request>,
-    ST: ChannelSender<Response<T>>,
+    SR: AsyncChannelReceiver<Request>,
+    ST: AsyncChannelSender<Response<T>>,
 {
     request_rx: SR,
     response_tx: ST,
@@ -45,12 +44,11 @@ where
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T, SR, ST> Sourcer<T, SR, ST>
+impl<T, SR, ST> AsyncSourcer<T, SR, ST>
 where
-    SR: ChannelReceiver<Request>,
-    ST: ChannelSender<Response<T>>,
+    SR: AsyncChannelReceiver<Request>,
+    ST: AsyncChannelSender<Response<T>>,
 {
-    /// Create a new Sourcer instance
     pub(crate) fn new(request_rx: SR, response_tx: ST, state: ChannelState<T>) -> Self {
         Self {
             request_rx,
@@ -61,13 +59,12 @@ where
     }
 }
 
-impl<T, SR, ST> Sourcer<T, SR, ST>
+impl<T, SR, ST> AsyncSourcer<T, SR, ST>
 where
     T: Send + 'static,
-    SR: ChannelReceiver<Request>,
-    ST: ChannelSender<Response<T>>,
+    SR: AsyncChannelReceiver<Request>,
+    ST: AsyncChannelSender<Response<T>>,
 {
-    /// Set a fixed value
     pub fn set_static(&self, val: T) -> Result<(), Error>
     where
         T: Clone,
@@ -79,7 +76,6 @@ where
         Ok(())
     }
 
-    /// Set a closure that implements [Fn]
     pub fn set<F>(&self, closure: F) -> Result<(), Error>
     where
         F: Fn() -> T + Send + Sync + 'static,
@@ -89,7 +85,6 @@ where
         Ok(())
     }
 
-    /// Set a closure that implements [FnMut]
     pub fn set_mut<F>(&self, closure: F) -> Result<(), Error>
     where
         F: FnMut() -> T + Send + Sync + 'static,
@@ -101,32 +96,25 @@ where
         Ok(())
     }
 
-    /// Close the channel
     pub fn close(&self) -> Result<(), Error> {
         self.state.swap(Arc::new(ValueSource::Cleared));
         Ok(())
     }
 
-    /// Handles requests - blocking
-    pub fn run(self) -> Result<(), Error> {
+    pub async fn run(self) -> Result<(), Error> {
         loop {
-            match self.request_rx.recv() {
+            match self.request_rx.recv().await {
                 Ok(Request::GetValue) => {
                     let response = self.handle_get_value()?;
-                    if self.response_tx.send(response).is_err() {
-                        // Consumer disconnected
+                    if self.response_tx.send(response).await.is_err() {
                         break;
                     }
                 }
                 Ok(Request::Close) => {
-                    // Close channel
                     self.close()?;
                     break;
                 }
-                Err(_) => {
-                    // Consumer disconnected
-                    break;
-                }
+                Err(_) => break,
             }
         }
         Ok(())
@@ -140,14 +128,14 @@ where
                 let value = self.execute_closure_safely(&mut || clone(val));
                 match value {
                     Ok(v) => Ok(Response::Value(v)),
-                    Err(_) => Ok(Response::NoSource), // Closure execution failed
+                    Err(_) => Ok(Response::NoSource),
                 }
             }
             ValueSource::Dynamic(closure) => {
                 let value = self.execute_closure_safely(&mut || closure());
                 match value {
                     Ok(v) => Ok(Response::Value(v)),
-                    Err(_) => Ok(Response::NoSource), // Closure execution failed
+                    Err(_) => Ok(Response::NoSource),
                 }
             }
             ValueSource::DynamicMut(closure) => {
@@ -155,11 +143,11 @@ where
                 let value = self.execute_closure_safely(&mut *closure);
                 match value {
                     Ok(v) => Ok(Response::Value(v)),
-                    Err(_) => Ok(Response::NoSource), // Closure execution failed
+                    Err(_) => Ok(Response::NoSource),
                 }
             }
-            ValueSource::None => Ok(Response::NoSource), // No source was ever set
-            ValueSource::Cleared => Ok(Response::Closed), // Channel was closed (source was set then cleared)
+            ValueSource::None => Ok(Response::NoSource),
+            ValueSource::Cleared => Ok(Response::Closed),
         }
     }
 
@@ -171,23 +159,22 @@ where
     }
 }
 
-impl<T, ST, SR> Sucker<T, ST, SR>
+impl<T, ST, SR> AsyncSucker<T, ST, SR>
 where
-    ST: ChannelSender<Request>,
-    SR: ChannelReceiver<Response<T>>,
+    ST: AsyncChannelSender<Request>,
+    SR: AsyncChannelReceiver<Response<T>>,
 {
-    /// Get the current value from the producer
-    pub fn get(&self) -> Result<T, Error> {
-        // Check if locally marked as closed
+    pub async fn get(&self) -> Result<T, Error> {
         if self.closed.load(Ordering::Acquire) {
             return Err(Error::ChannelClosed);
         }
 
         self.request_tx
             .send(Request::GetValue)
+            .await
             .map_err(|_| Error::ProducerDisconnected)?;
 
-        match self.response_rx.recv() {
+        match self.response_rx.recv().await {
             Ok(Response::Value(value)) => Ok(value),
             Ok(Response::NoSource) => Err(Error::NoSource),
             Ok(Response::Closed) => Err(Error::ChannelClosed),
@@ -195,20 +182,15 @@ where
         }
     }
 
-    /// Check if the channel is closed
-    pub fn is_closed(&self) -> bool {
-        // Send a test request
-        self.request_tx.send(Request::GetValue).is_err()
+    pub async fn is_closed(&self) -> bool {
+        self.request_tx.send(Request::GetValue).await.is_err()
     }
 
-    /// Close the channel from the consumer side
-    pub fn close(&self) -> Result<(), Error> {
-        // Mark locally as closed
+    pub async fn close(&self) -> Result<(), Error> {
         self.closed.store(true, Ordering::Release);
-
-        // Send close request
         self.request_tx
             .send(Request::Close)
+            .await
             .map_err(|_| Error::ProducerDisconnected)
     }
 }

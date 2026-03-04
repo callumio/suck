@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 #[cfg(feature = "sync-crossbeam")]
-use crate::sync::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
+use crate::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
 use crate::types;
 use arc_swap::ArcSwap;
 use crossbeam_channel;
