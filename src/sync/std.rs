@@ -77,7 +77,17 @@ impl<T> StdSuck<T> {
 mod tests {
     use super::*;
     use crate::Error;
+    use crate::sync::traits::ChannelType;
     use std::thread;
+
+    #[derive(Debug)]
+    struct PanicOnClone;
+
+    impl Clone for PanicOnClone {
+        fn clone(&self) -> Self {
+            panic!("intentional panic from Clone");
+        }
+    }
 
     #[test]
     fn test_pre_computed_value() {
@@ -216,6 +226,110 @@ mod tests {
         assert!(matches!(result, Err(Error::ProducerDisconnected)));
 
         let _ = producer_handle.join();
+    }
+
+    #[test]
+    fn test_run_breaks_when_response_receiver_is_dropped() {
+        let (request_tx, request_rx) = StdChannel::create_request_channel();
+        let (response_tx, response_rx) = StdChannel::create_response_channel::<i32>();
+        drop(response_rx);
+
+        let state = Arc::new(crate::types::ValueSource::None);
+        let state = ArcSwap::new(state);
+        let sourcer = crate::Sourcer::new(request_rx, response_tx, state);
+        sourcer.set_static(42).unwrap();
+
+        let producer_handle = thread::spawn(move || sourcer.run().unwrap());
+
+        request_tx.send(crate::types::Request::GetValue).unwrap();
+
+        producer_handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_run_breaks_when_request_sender_is_dropped() {
+        let (request_tx, request_rx) = StdChannel::create_request_channel();
+        let (response_tx, _response_rx) = StdChannel::create_response_channel::<i32>();
+        drop(request_tx);
+
+        let state = Arc::new(crate::types::ValueSource::None);
+        let state = ArcSwap::new(state);
+        let sourcer = crate::Sourcer::new(request_rx, response_tx, state);
+
+        sourcer.run().unwrap();
+    }
+
+    #[test]
+    fn test_static_source_panic_returns_no_source() {
+        let (sucker, sourcer) = StdSuck::<PanicOnClone>::pair();
+
+        let producer_handle = thread::spawn(move || {
+            sourcer.set_static(PanicOnClone).unwrap();
+            sourcer.run().unwrap();
+        });
+
+        let result = sucker.get();
+        assert!(matches!(result, Err(Error::NoSource)));
+
+        sucker.close().unwrap();
+        producer_handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_dynamic_source_panic_returns_no_source() {
+        let (sucker, sourcer) = StdSuck::<i32>::pair();
+
+        let producer_handle = thread::spawn(move || {
+            sourcer
+                .set(|| -> i32 {
+                    panic!("intentional panic from Fn source");
+                })
+                .unwrap();
+            sourcer.run().unwrap();
+        });
+
+        let result = sucker.get();
+        assert!(matches!(result, Err(Error::NoSource)));
+
+        sucker.close().unwrap();
+        producer_handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_dynamic_mut_source_panic_returns_no_source() {
+        let (sucker, sourcer) = StdSuck::<i32>::pair();
+
+        let producer_handle = thread::spawn(move || {
+            sourcer
+                .set_mut(|| -> i32 {
+                    panic!("intentional panic from FnMut source");
+                })
+                .unwrap();
+            sourcer.run().unwrap();
+        });
+
+        let result = sucker.get();
+        assert!(matches!(result, Err(Error::NoSource)));
+
+        sucker.close().unwrap();
+        producer_handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_cleared_source_returns_channel_closed() {
+        let (sucker, sourcer) = StdSuck::<i32>::pair();
+
+        let producer_handle = thread::spawn(move || {
+            sourcer.set_static(42).unwrap();
+            sourcer.close().unwrap();
+            sourcer.run().unwrap();
+        });
+
+        let result = sucker.get();
+        assert!(matches!(result, Err(Error::ChannelClosed)));
+
+        sucker.close().unwrap();
+        producer_handle.join().unwrap();
     }
 
     #[test]
