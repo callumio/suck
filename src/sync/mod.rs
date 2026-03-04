@@ -1,3 +1,5 @@
+pub mod traits;
+
 #[cfg(feature = "sync-crossbeam")]
 pub mod crossbeam;
 #[cfg(feature = "sync-flume")]

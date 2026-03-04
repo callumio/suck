@@ -6,8 +6,6 @@ pub mod async_channel;
 #[cfg(feature = "sync")]
 pub mod channel;
 pub mod error;
-#[cfg(feature = "sync")]
-pub mod traits;
 
 #[cfg(feature = "async")]
 pub mod asynchronous;

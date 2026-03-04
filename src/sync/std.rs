@@ -1,6 +1,6 @@
 use arc_swap::ArcSwap;
 
-use crate::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
+use crate::sync::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
 use crate::types;
 use std::sync::Arc;
 #[cfg(feature = "sync-std")]
@@ -77,7 +77,7 @@ impl<T> StdSuck<T> {
 mod tests {
     use super::*;
     use crate::Error;
-    use crate::traits::ChannelType;
+    use crate::sync::traits::ChannelType;
     use std::thread;
 
     #[derive(Debug)]

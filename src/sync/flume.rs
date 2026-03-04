@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 #[cfg(feature = "sync-flume")]
-use crate::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
+use crate::sync::traits::{ChannelError, ChannelReceiver, ChannelSender, ChannelType};
 use crate::types;
 use arc_swap::ArcSwap;
 use flume;

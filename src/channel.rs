@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::error::Error;
-use crate::traits::{ChannelReceiver, ChannelSender};
+use crate::sync::traits::{ChannelReceiver, ChannelSender};
 use crate::types::{ChannelState, Request, Response, ValueSource};
 
 /// The consumer side of the channel that requests values
