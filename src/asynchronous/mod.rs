@@ -1,3 +1,4 @@
+pub mod channel;
 pub mod traits;
 
 #[cfg(feature = "async-tokio")]

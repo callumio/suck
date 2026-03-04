@@ -7,9 +7,12 @@ use arc_swap::ArcSwap;
 use flume;
 
 type FlumeSucker<T> =
-    crate::Sucker<T, FlumeSender<types::Request>, FlumeReceiver<types::Response<T>>>;
-type FlumeSourcer<T> =
-    crate::Sourcer<T, FlumeReceiver<types::Request>, FlumeSender<types::Response<T>>>;
+    crate::sync::channel::Sucker<T, FlumeSender<types::Request>, FlumeReceiver<types::Response<T>>>;
+type FlumeSourcer<T> = crate::sync::channel::Sourcer<
+    T,
+    FlumeReceiver<types::Request>,
+    FlumeSender<types::Response<T>>,
+>;
 
 /// Internal sender type for flume backend  
 pub struct FlumeSender<T>(flume::Sender<T>);
@@ -68,8 +71,8 @@ impl<T> FlumeSuck<T> {
         let state = Arc::new(crate::types::ValueSource::None);
         let state = ArcSwap::new(state);
 
-        let sucker = crate::Sucker::new(request_tx, response_rx);
-        let sourcer = crate::Sourcer::new(request_rx, response_tx, state);
+        let sucker = crate::sync::channel::Sucker::new(request_tx, response_rx);
+        let sourcer = crate::sync::channel::Sourcer::new(request_rx, response_tx, state);
 
         (sucker, sourcer)
     }

@@ -9,10 +9,16 @@ use crate::asynchronous::traits::{
 };
 use crate::types;
 
-type TokioSucker<T> =
-    crate::AsyncSucker<T, TokioSender<types::Request>, TokioReceiver<types::Response<T>>>;
-type TokioSourcer<T> =
-    crate::AsyncSourcer<T, TokioReceiver<types::Request>, TokioSender<types::Response<T>>>;
+type TokioSucker<T> = crate::asynchronous::channel::AsyncSucker<
+    T,
+    TokioSender<types::Request>,
+    TokioReceiver<types::Response<T>>,
+>;
+type TokioSourcer<T> = crate::asynchronous::channel::AsyncSourcer<
+    T,
+    TokioReceiver<types::Request>,
+    TokioSender<types::Response<T>>,
+>;
 
 pub struct TokioSender<T>(mpsc::UnboundedSender<T>);
 pub struct TokioReceiver<T>(Mutex<mpsc::UnboundedReceiver<T>>);
@@ -70,8 +76,9 @@ impl<T> TokioSuck<T> {
         let (response_tx, response_rx) = TokioChannel::create_response_channel::<T>();
         let state = ArcSwap::new(Arc::new(crate::types::ValueSource::None));
 
-        let sucker = crate::AsyncSucker::new(request_tx, response_rx);
-        let sourcer = crate::AsyncSourcer::new(request_rx, response_tx, state);
+        let sucker = crate::asynchronous::channel::AsyncSucker::new(request_tx, response_rx);
+        let sourcer =
+            crate::asynchronous::channel::AsyncSourcer::new(request_rx, response_tx, state);
 
         (sucker, sourcer)
     }
