@@ -134,6 +134,38 @@ mod tests {
     }
 
     #[test]
+    fn test_mut_closure_value() {
+        let (sucker, sourcer) = FlumeSuck::<i32>::pair();
+
+        // Start producer
+        let producer_handle = std::thread::spawn(move || {
+            let mut count = 0;
+            sourcer
+                .set_mut(move || {
+                    count += 1;
+                    count
+                })
+                .unwrap();
+            sourcer.run().unwrap();
+        });
+
+        // Ensure consumer gets incrementing values from the mutable closure
+        let value1 = sucker.get().unwrap();
+        assert_eq!(value1, 1);
+
+        let value2 = sucker.get().unwrap();
+        assert_eq!(value2, 2);
+
+        let value3 = sucker.get().unwrap();
+        assert_eq!(value3, 3);
+
+        // Close consumer
+        sucker.close().unwrap();
+
+        producer_handle.join().unwrap();
+    }
+
+    #[test]
     fn test_no_source_error() {
         let (sucker, sourcer) = FlumeSuck::<i32>::pair();
 
